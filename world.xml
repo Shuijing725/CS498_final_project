@@ -11,6 +11,9 @@
   <rigidObject name="test_tube_holder" translation="0.5 0 0.725" rotateZ="1.57079" rotateX="3.14159" rotateY="0.0">
     <geometry file="objects/test_tube_holder.ply" scale="0.5 0.5 0.5"/>
   </rigidObject>
+  <rigidObject name="trash_can" translation="0.5 0.5 0.0" rotateZ="1.57079" rotateX="-1.57079" rotateY="-3.14159">
+    <geometry file="objects/trash_can.dae" scale="0.5 0.5 0.5"/>
+  </rigidObject>
 
   <terrain name="floor" file="objects/plane.env"/>
   <!-- the table -->
