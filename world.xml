@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<world>
+  <robot name="Kinova" file="robot/kinova_with_robotiq_85.urdf" translation="0.0 0 0.6"/>
+  <!-- the pedestal -->
+  <terrain file="objects/cube.off" scale="0.3 0.3 0.59" translation="-0.15 -0.15 0.0">
+     <display color="0.2 0.2 0.2"/>
+  </terrain>
+  <rigidObject name="tube" translation="0.5 0.025 0.8" rotateZ="1.57079" rotateX="1.57079" rotateY="0.0" >
+    <geometry file="objects/tube.ply" scale="0.5 0.5 0.5"/>
+  </rigidObject>
+  <rigidObject name="test_tube_holder" translation="0.5 0 0.725" rotateZ="1.57079" rotateX="3.14159" rotateY="0.0">
+    <geometry file="objects/test_tube_holder.ply" scale="0.5 0.5 0.5"/>
+  </rigidObject>
+
+  <terrain name="floor" file="objects/plane.env"/>
+  <!-- the table -->
+  <terrain file="objects/cube.off" scale="0.05 0.05 0.6" translation="0.4 0.25 0.01">
+     <display color="0.4 0.3 0.2"/>
+  </terrain>
+  <terrain file="objects/cube.off" scale="0.05 0.05 0.6" translation="0.4 -0.25 0.01">
+     <display color="0.4 0.3 0.2"/>
+  </terrain>
+  <terrain file="objects/cube.off" scale="0.05 0.05 0.6" translation="0.9 0.25 0.01">
+     <display color="0.4 0.3 0.2"/>
+  </terrain>
+  <terrain file="objects/cube.off" scale="0.05 0.05 0.6" translation="0.9 -0.25 0.01">
+     <display color="0.4 0.3 0.2"/>
+  </terrain>
+  <terrain file="objects/cube.off" scale="0.6 0.6 0.02" translation="0.375 -0.275 0.615">
+     <display color="0.4 0.3 0.2"/>
+  </terrain>
+</world>
