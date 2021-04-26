@@ -297,7 +297,7 @@ class PlacePlanner(MultiStepPlanner):
 
     def solve_preplace(self,qplace):
         #TODO: solve for the preplacement configuration
-        q_preplace=self.gripper.set_finger_config(qplace, self.gripper.partway_open_config(0.5))
+        q_preplace=self.gripper.set_finger_config(qplace, self.gripper.partway_open_config(0.1))
         self.robot.setConfig(q_preplace)
         if not self.feasible():
             print('q_preplace')
