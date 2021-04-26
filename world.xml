@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <world>
-  <robot name="Kinova" file="robot/kinova_with_robotiq_85.urdf" translation="0.0 0 0.6"/>
-  <!-- the pedestal -->
+  <robot name="Kinova1" file="robot/kinova_with_robotiq_85.urdf" translation="0.0 0 0.6"/>
+  <!-- the pedestal 1 -->
   <terrain file="objects/cube.off" scale="0.3 0.3 0.59" translation="-0.15 -0.15 0.0">
      <display color="0.2 0.2 0.2"/>
   </terrain>
+  
+  <robot name="Kinova2" file="robot/kinova_with_robotiq_85.urdf" translation="1.3 0.7 0.6"/>
+  <!-- the pedestal 2 -->
+  <terrain file="objects/cube.off" scale="0.3 0.3 0.59" translation="1.15 0.55 0.0">
+     <display color="0.2 0.2 0.2"/>
+  </terrain>
+  
   <rigidObject name="tube" translation="0.5 0.025 0.72" rotateZ="1.57079" rotateX="1.57079" rotateY="0.0" >
     <geometry file="objects/tube.ply" scale="0.5 0.5 0.5"/>
   </rigidObject>
@@ -17,12 +24,16 @@
     <geometry file="objects/swab.ply" scale="0.5 0.5 0.5"/>
   </rigidObject>
 
-  <rigidObject name="trash_can" translation="0.5 0.5 0.12" rotateZ="0.0" rotateX="0.0" rotateY="0.0">
+  <rigidObject name="trash_can" translation="0.2 0.5 0.12" rotateZ="0.0" rotateX="0.0" rotateY="0.0">
     <geometry file="objects/trash_can.ply" scale="0.1 0.1 0.1"/>
   </rigidObject>
+  
+  <rigidObject name="micro_plate" translation="0.9 0.5 0.63" rotateZ="0.0" rotateX="1.57079" rotateY="0.0">
+    <geometry file="objects/reaction_plate.dae" scale="1 1 1"/>
+  </rigidObject>
 
-  <terrain name="floor" file="objects/plane.env"/>
-  <!-- the table -->
+
+  <!-- the table 1 -->
   <terrain file="objects/cube.off" scale="0.05 0.05 0.6" translation="0.4 0.25 0.01">
      <display color="0.4 0.3 0.2"/>
   </terrain>
@@ -38,4 +49,24 @@
   <terrain file="objects/cube.off" scale="0.6 0.6 0.02" translation="0.375 -0.275 0.615">
      <display color="0.4 0.3 0.2"/>
   </terrain>
+  
+  <!-- the table 2 -->
+  <terrain file="objects/cube.off" scale="0.05 0.05 0.6" translation="0.4 0.9 0.01">
+     <display color="0.4 0.3 0.2"/>
+  </terrain>
+  <terrain file="objects/cube.off" scale="0.05 0.05 0.6" translation="0.4 0.4 0.01">
+     <display color="0.4 0.3 0.2"/>
+  </terrain>
+  <terrain file="objects/cube.off" scale="0.05 0.05 0.6" translation="0.9 0.9 0.01">
+     <display color="0.4 0.3 0.2"/>
+  </terrain>
+  <terrain file="objects/cube.off" scale="0.05 0.05 0.6" translation="0.9 0.4 0.01">
+     <display color="0.4 0.3 0.2"/>
+  </terrain>
+  <terrain file="objects/cube.off" scale="0.6 0.6 0.02" translation="0.375 0.375 0.615">
+     <display color="0.4 0.3 0.2"/>
+  </terrain>
+  
+  <!-- the floor -->
+  <terrain name="floor" file="objects/plane.off"/>
 </world>
