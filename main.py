@@ -139,7 +139,7 @@ if __name__ == '__main__':
 
     vis.addAction(planTriggered,"Plan grasp",'p')
 
-    
+
     executing_plan = False
     execute_start_time = None
 
