@@ -158,7 +158,13 @@ if __name__ == '__main__':
 
 
     vis.addAction(executePlan, "Execute plan", 'e')
-
+    
+    plate_mass = world.rigidObject("plate").getMass()
+    plate_mass.setInertia([1,0,0,0,1,0,0,0,1])
+    world.rigidObject("plate").setMass(plate_mass)
+    plate_mass = world.rigidObject("pcr").getMass()
+    plate_mass.setInertia([1,0,0,0,1,0,0,0,1])
+    world.rigidObject("pcr").setMass(plate_mass)
     sim = Simulator(world)
     sim_dt = 0.02
     was_grasping = False

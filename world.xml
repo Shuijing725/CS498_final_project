@@ -31,6 +31,10 @@
   <rigidObject name="pcr" translation="-1.9 -1.6 0.63" rotateZ="0.0" rotateX="1.57079" rotateY="0.0">
     <geometry file="objects/pcr.dae" scale="1 1 1"/>
   </rigidObject>
+  
+  <rigidObject name="plate" translation="0.9 0.5 0.63" rotateZ="0.0" rotateX="1.57079" rotateY="0.0">
+    <geometry file="objects/reaction_plate.dae" scale="1 1 1"/>
+  </rigidObject>
 
 
   <!-- the table 1 -->
