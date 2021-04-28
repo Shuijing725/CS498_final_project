@@ -34,6 +34,13 @@ if __name__ == '__main__':
         m.estimate(obj.geometry(),mass=0.454,surfaceFraction=0.2)
         obj.setMass(m)
 
+    plate_mass = world.rigidObject("plate").getMass()
+    plate_mass.setInertia([1,0,0,0,1,0,0,0,1])
+    world.rigidObject("plate").setMass(plate_mass)
+    plate_mass = world.rigidObject("pcr").getMass()
+    plate_mass.setInertia([1,0,0,0,1,0,0,0,1])
+    world.rigidObject("pcr").setMass(plate_mass)
+    
     #load the gripper info and grasp database
     source_gripper = robotiq_85
     target_gripper = robotiq_85_kinova_gen3
@@ -43,6 +50,7 @@ if __name__ == '__main__':
         raise RuntimeError("Can't load grasp database?")
 
     robot = world.robot(0)
+    robot2 = world.robot(1)
     gripper_link = robot.link(9)
     #need to fix the spin joints somewhat
     qmin,qmax = robot.getJointLimits()
@@ -159,12 +167,16 @@ if __name__ == '__main__':
 
     vis.addAction(executePlan, "Execute plan", 'e')
     
-    plate_mass = world.rigidObject("plate").getMass()
-    plate_mass.setInertia([1,0,0,0,1,0,0,0,1])
-    world.rigidObject("plate").setMass(plate_mass)
-    plate_mass = world.rigidObject("pcr").getMass()
-    plate_mass.setInertia([1,0,0,0,1,0,0,0,1])
-    world.rigidObject("pcr").setMass(plate_mass)
+    robot2_target = None
+    def transferPlate():
+        global robot2_target
+        link = robot2.link('EndEffector_Link')
+        goal = ik.objective(link,local=[p1,p2,p3],world=[r1,r2,r3])
+        ik.solve(goal)
+        robot2_target = robot2.getConfig()
+    
+    vis.addAction(transferPlate, "Transfer plate", 't')
+    
     sim = Simulator(world)
     sim_dt = 0.02
     was_grasping = False
@@ -172,6 +184,9 @@ if __name__ == '__main__':
 
     def loop_callback():
         global was_grasping, Tobject_grasp, solved_trajectory, trajectory_is_transfer, executing_plan, execute_start_time, qstart, next_item_to_pick
+        global robot2_target
+        if robot2_target is not None:
+            robot2.setConfig(robot2_target)
         if not executing_plan:
             return
         if PHYSICS_SIMULATION:
