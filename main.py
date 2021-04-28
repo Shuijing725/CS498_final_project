@@ -82,12 +82,20 @@ if __name__ == '__main__':
     solved_trajectory = None
     trajectory_is_transfer = None
     next_item_to_pick = 0
+    vis.add('tube', (0.5, 0.025, 0.72), c=(0, 1, 0, 1))
+    vis.add('1', (0.5-0.008, 0.025-0.008, 0.72), c=(0, 1, 0, 1))
+    vis.add('2', (0.5-0.008, 0.025+0.008, 0.72), c=(0, 1, 0, 1))
+    vis.add('3', (0.5+0.008, 0.025-0.008, 0.72), c=(0, 1, 0, 1))
+    vis.add('4', (0.5+0.008, 0.025+0.008, 0.72), c=(0, 1, 0, 1))
+
     def planTriggered():
         global world,robot,obj,target_gripper,grasp, solved_trajectory, trajectory_is_transfer, next_item_to_pick
 
         Tobj0 = obj.getTransform()
-        # Todo: change according to tube dimension & position
-        goal_bounds = [(-0.08, -0.68, 0.4), (0.48, -0.32, 0.5)]
+        # center of tube: (0.5 0.025 0.72)
+        goal_bounds = [(0.5-0.008, 0.025-0.008, 0.8), (0.5+0.008, 0.025+0.008, 0.9)]
+        vis.add('goal bound 0', goal_bounds[0], c=(0, 1, 0, 1))
+        vis.add('goal bound 1', goal_bounds[1], c=(0, 1, 0, 1))
         qstart = robot.getConfig()
         res = pick.plan_pick_one(world,robot,obj,target_gripper,grasp)
 

@@ -13,6 +13,7 @@ import time
 import random
 from pick import is_collision_free_grasp,retract,MultiStepPlanner,StepResult
 import numpy as np
+import copy
 
 
 def transfer_plan(world,robot,qtarget,object,Tobject_gripper):
@@ -189,11 +190,13 @@ class PlacePlanner(MultiStepPlanner):
         xmin,ymin,zmin = self.goal_bounds[0]
         xmax,ymax,zmax = self.goal_bounds[1]
         center_sampling_range = [(xmin+min_dims/2,xmax-min_dims/2),(ymin+min_dims/2,ymax-min_dims/2)]
+        center_sampling_range = [(xmin, xmax), (ymin, ymax)]
         Tobj_feasible = []
         for iters in range(20):
             crand = [random.uniform(b[0],b[1]) for b in center_sampling_range]
             Robj = so3.rotation((0,0,1),random.uniform(0,math.pi*2))
             tobj = vectorops.add(so3.apply(Robj,[-center[0],-center[1],0]),[crand[0],crand[1],zmin-ozmin+0.002])
+
             self.object.setTransform(Robj,tobj)
             feasible = True
             for i in range(self.world.numTerrains()):
@@ -319,10 +322,11 @@ class PlacePlanner(MultiStepPlanner):
     def solve_transfer(self,qpreplace):
         #TODO: solve for the transfer plan
         self.robot.setConfig(qpreplace)
-        self.qtransfer=retract(self.robot,self.gripper,amount=[0,0,0.1], local=False)
+        self.qtransfer=retract(self.robot,self.gripper,amount=[0,0,0.3], local=False)
         if self.qtransfer is None:
             print('qtransfer')
             return None
+
         self.robot.setConfig(self.qtransfer)
         if not self.feasible(): return None
         self.robot.setConfig(self.qstart)
@@ -335,9 +339,29 @@ class PlacePlanner(MultiStepPlanner):
         qplace = plan['qplace']
         qpreplace = plan['qpreplace']
         retract = plan['retract']
+
+        # add a waypoint to place the swab vertically
+        # secondary_axis_gripper = self.gripper.secondary_axis
+        # if not isinstance(self.gripper, (int, str)):
+        #     gripper1 = self.gripper.base_link
+        # else:
+        #     gripper1 = self.gripper
+        # link = self.robot.link(gripper1)
+        # R_gripper_w, _ = link.getTransform()
+        # secondary_axis_world = so3.apply(R_gripper_w, secondary_axis_gripper)
+        # secondary_axis_world_2d = np.array(secondary_axis_world)[:-1]
+        # angle = np.arccos(np.dot(secondary_axis_world_2d, [0, 1]))
+        angle = -np.pi/2
+        q_rotate = copy.deepcopy(self.qtransfer)
+        q_rotate[7] = q_rotate[7] - angle
+        qpreplace[7] = qpreplace[7] - angle
+        qplace[7] = qplace[7] - angle
+        retract[7] = retract[7] - angle
+
         #TODO: construct the RobotTrajectory tuple (transfer,lower,retract)
+        # todo: add a waypoint between qtransfer and qpreplace
         return RobotTrajectory(self.robot, milestones=[self.qstart] + transfer), \
-               RobotTrajectory(self.robot, milestones=[self.qtransfer, qpreplace, qplace]), \
+               RobotTrajectory(self.robot, milestones=[self.qtransfer, q_rotate, qpreplace, qplace]), \
                RobotTrajectory(self.robot, milestones=[qplace, retract])
 
 
@@ -374,5 +398,6 @@ class PlacePlanner(MultiStepPlanner):
 
 def plan_place(world,robot,obj,Tobject_gripper,gripper,goal_bounds):
     planner = PlacePlanner(world,robot,obj,Tobject_gripper,gripper,goal_bounds)
-    time_limit = 30
-    return planner.solve(time_limit)
+    # time_limit = 30
+    return planner.solve()
+
