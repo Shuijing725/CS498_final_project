@@ -170,8 +170,16 @@ if __name__ == '__main__':
     robot2_target = None
     def transferPlate():
         global robot2_target
+        plate_obj = world.rigidObject("plate")
+        plate_xform = plate_obj.getTransform()
+        plate_R, plate_t = plate_xform
         link = robot2.link('EndEffector_Link')
-        goal = ik.objective(link,local=[p1,p2,p3],world=[r1,r2,r3])
+        ee_local_pos = (0, 0, 0)
+        ee_local_axis = (1, 0, 0)
+        h = 0.1
+        plate_axis = plate_R[3:6]
+        plate_t[2] += 0.15
+        goal = ik.objective(link,local=[ee_local_pos,vectorops.madd(ee_local_pos,axis_local_array, h)],world=[plate_t,vectorops.madd(plate_t,plate_axis, -h)])
         ik.solve(goal)
         robot2_target = robot2.getConfig()
     
