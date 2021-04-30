@@ -82,20 +82,24 @@ if __name__ == '__main__':
     solved_trajectory = None
     trajectory_is_transfer = None
     next_item_to_pick = 0
-    vis.add('tube', (0.5, 0.025, 0.72), c=(0, 1, 0, 1))
-    vis.add('1', (0.5-0.008, 0.025-0.008, 0.72), c=(0, 1, 0, 1))
-    vis.add('2', (0.5-0.008, 0.025+0.008, 0.72), c=(0, 1, 0, 1))
-    vis.add('3', (0.5+0.008, 0.025-0.008, 0.72), c=(0, 1, 0, 1))
-    vis.add('4', (0.5+0.008, 0.025+0.008, 0.72), c=(0, 1, 0, 1))
+    T_gripper_w = robot.link(9).getTransform()
+    for i in range(robot.numLinks()):
+        print(robot.link(i).getName())
+    vis.add('', vectorops.add(se3.apply_rotation(T_gripper_w, [0, 0, 0.1+0.06]), T_gripper_w[1]), color=[1, 0, 0, 1])
+    # vis.add('tube', (0.5, 0.025, 0.72), c=(0, 1, 0, 1))
+    # vis.add('1', (0.5-0.008, 0.025-0.008, 0.72), c=(0, 1, 0, 1))
+    # vis.add('2', (0.5-0.008, 0.025+0.008, 0.72), c=(0, 1, 0, 1))
+    # vis.add('3', (0.5+0.008, 0.025-0.008, 0.72), c=(0, 1, 0, 1))
+    # vis.add('4', (0.5+0.008, 0.025+0.008, 0.72), c=(0, 1, 0, 1))
 
     def planTriggered():
         global world,robot,obj,target_gripper,grasp, solved_trajectory, trajectory_is_transfer, next_item_to_pick
 
         Tobj0 = obj.getTransform()
         # center of tube: (0.5 0.025 0.72)
-        goal_bounds = [(0.5-0.008, 0.025-0.008, 0.8), (0.5+0.008, 0.025+0.008, 0.9)]
-        vis.add('goal bound 0', goal_bounds[0], c=(0, 1, 0, 1))
-        vis.add('goal bound 1', goal_bounds[1], c=(0, 1, 0, 1))
+        goal_bounds = [(0.5-0.008, 0.025-0.008, 0.8), (0.5+0.008, 0.025+0.008, 1.)]
+        # vis.add('goal bound 0', goal_bounds[0], c=(0, 1, 0, 1))
+        # vis.add('goal bound 1', goal_bounds[1], c=(0, 1, 0, 1))
         qstart = robot.getConfig()
         res = pick.plan_pick_one(world,robot,obj,target_gripper,grasp)
 
@@ -111,6 +115,8 @@ if __name__ == '__main__':
             print(qgrasp)
             robot.setConfig(qgrasp)
             Tobj = obj.getTransform()
+            # T_ee_w = robot.link(9).getTransform()
+            # Tobject_grasp = se3.mul(se3.inv(T_obj_w), T_ee_w)
             Tobject_grasp = se3.mul(se3.inv(gripper_link.getTransform()), Tobj)
 
             robot.setConfig(lift.milestones[-1])
@@ -143,7 +149,12 @@ if __name__ == '__main__':
                 obj.setTransform(*Tobj0)
 
                 vis.add("traj", traj, endEffectors=[gripper_link.index])
-        robot.setConfig(qstart)
+        # robot.setConfig(qstart)
+        #
+        # traj = RobotTrajectory(robot, milestones=[qstart, qgrasp])
+        # vis.add("traj", traj, endEffectors=[gripper_link.index])
+        # solved_trajectory = traj
+        # robot.setConfig(qstart)
 
     vis.addAction(planTriggered,"Plan grasp",'p')
 

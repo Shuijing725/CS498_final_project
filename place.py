@@ -181,55 +181,64 @@ class PlacePlanner(MultiStepPlanner):
                 return False
         return True
 
+    def check_feasible(self):
+        for i in range(self.world.numTerrains()):
+            if self.object.geometry().collides(self.world.terrain(i).geometry()):
+                return False
+
+        for i in range(self.world.numRigidObjects()):
+            if i == self.object.index: continue
+            if self.object.geometry().collides(self.world.rigidObject(i).geometry()):
+                return False
+        return True
+
     def solve_placement(self):
         """Implemented for you: come up with a collision-free target placement"""
-        obmin,obmax = self.objbb
-        ozmin = obmin[2]
-        min_dims = min(obmax[0]-obmin[0],obmax[1]-obmin[1])
-        center = [0.5*(obmax[0]+obmin[0]),0.5*(obmax[1]-obmin[1])]
+        # obmin,obmax = self.objbb
+        # ozmin = obmin[2]
+        # min_dims = min(obmax[0]-obmin[0],obmax[1]-obmin[1])
+        # center = [0.5*(obmax[0]+obmin[0]),0.5*(obmax[1]-obmin[1])]
         xmin,ymin,zmin = self.goal_bounds[0]
         xmax,ymax,zmax = self.goal_bounds[1]
-        center_sampling_range = [(xmin+min_dims/2,xmax-min_dims/2),(ymin+min_dims/2,ymax-min_dims/2)]
-        center_sampling_range = [(xmin, xmax), (ymin, ymax)]
+        #center_sampling_range = [(xmin+min_dims/2,xmax-min_dims/2),(ymin+min_dims/2,ymax-min_dims/2)]
+        center_sampling_range = [(xmin, xmax), (ymin, ymax), (zmin, zmax)]
         Tobj_feasible = []
+        original_obj_tarnsform=self.object.getTransform()
         for iters in range(20):
             crand = [random.uniform(b[0],b[1]) for b in center_sampling_range]
-            Robj = so3.rotation((0,0,1),random.uniform(0,math.pi*2))
-            tobj = vectorops.add(so3.apply(Robj,[-center[0],-center[1],0]),[crand[0],crand[1],zmin-ozmin+0.002])
+            #Robj = so3.rotation((0,0,1),random.uniform(0,math.pi*2))
+            Robj=so3.identity()
+            #tobj = vectorops.add(so3.apply(Robj,[-center[0],-center[1],0]),[crand[0],crand[1],zmin-ozmin+0.002])
+            tobj=[crand[0], crand[1], crand[2]]
+
 
             self.object.setTransform(Robj,tobj)
-            feasible = True
-            for i in range(self.world.numTerrains()):
-                if self.object.geometry().collides(self.world.terrain(i).geometry()):
-                    feasible=False
-                    break
-            if not feasible:
-                bmin,bmax = self.object.geometry().getBBTight()
-                if bmin[0] < xmin:
-                    tobj[0] += xmin-bmin[0]
-                if bmax[0] > xmax:
-                    tobj[0] -= bmin[0]-xmax
-                if bmin[1] < ymin:
-                    tobj[1] += ymin-bmin[1]
-                if bmax[1] > ymax:
-                    tobj[1] -= bmin[1]-ymax
-                self.object.setTransform(Robj,tobj)
-                feasible = True
-                for i in range(self.world.numTerrains()):
-                    if self.object.geometry().collides(self.world.terrain(i).geometry()):
-                        feasible=False
-                        break
-                if not feasible:
-                    continue
-            for i in range(self.world.numRigidObjects()):
-                if i == self.object.index: continue
-                if self.object.geometry().collides(self.world.rigidObject(i).geometry()):
-                    #raise it up a bit
-                    bmin,bmax = self.world.rigidObject(i).geometry().getBB()
-                    tobj[2] = bmax[2]-ozmin+0.002
-                    self.object.setTransform(Robj,tobj)
+            # vis.add("abdbdbd", tobj)
+
+            if not self.check_feasible():
+                continue
+                # bmin,bmax = self.object.geometry().getBBTight()
+                # if bmin[0] < xmin:
+                #     tobj[0] += xmin-bmin[0]
+                # if bmax[0] > xmax:
+                #     tobj[0] -= bmin[0]-xmax
+                # if bmin[1] < ymin:
+                #     tobj[1] += ymin-bmin[1]
+                # if bmax[1] > ymax:
+                #     tobj[1] -= bmin[1]-ymax
+                # self.object.setTransform(Robj,tobj)
+                # feasible = True
+                # for i in range(self.world.numTerrains()):
+                #     if self.object.geometry().collides(self.world.terrain(i).geometry()):
+                #         feasible=False
+                #         break
+                # if not feasible:
+                #     continue
+
             Tobj_feasible.append((Robj,tobj))
         print("Found",len(Tobj_feasible),"valid object placements")
+        self.object.setTransform(original_obj_tarnsform[0], original_obj_tarnsform[1])
+        print("Tobj_feasible", Tobj_feasible)
         return Tobj_feasible
 
 
@@ -287,10 +296,40 @@ class PlacePlanner(MultiStepPlanner):
         return True
 
     def solve_qplace(self,Tplacement):
-        Tplacement1=se3.mul(Tplacement, se3.inv(self.Tobject_gripper))
-        objective = ik.objective(self.robot.link(9), R=Tplacement1[0], t=Tplacement1[1])
-        solved = ik.solve_global(objectives=objective, iters=50, numRestarts=5, activeDofs=[1, 2, 3, 4, 5, 6, 7],
-                                 feasibilityCheck=self.feasible)
+        vis.add('link 9', self.robot.link(9), color=[1, 0, 0, 1])
+        print("TPla", Tplacement)
+        # vis.add('goal', Tplacement[1], color=[1, 0, 0, 1])
+        # Tplacement[1][0] = Tplacement[1][0] + 0.1
+        vis.add('goal obj', Tplacement[1], color=[0, 1, 0, 1])
+        print('Tobj_gripper',self.Tobject_gripper)
+        # Tplacement1=se3.mul(Tplacement, se3.inv(self.Tobject_gripper))
+        T_gripper_w=self.robot.link(9).getTransform()
+
+        v=vectorops.add(T_gripper_w[1], [0,0,0.1+0.06])# se3.apply_rotation(T_gripper_w, [0,0,0.1+0.06])
+        objective = ik.objective(self.robot.link(9), R=Tplacement[0], t=vectorops.add(Tplacement[1], v))
+
+        # h = 0.1
+        # ee_local_pos = (0, 0, 0)
+        # # we want the end effector to grasp from top of the object
+        # ee_local_axis = self.gripper.primary_axis  # (1, 0, 0)
+        # # vis.add('origin', (0, 0, 0), color=(0, 1, 0, 1))
+        # # vis.add('ee local axis', ee_local_axis, color=(0, 1, 0, 1))
+        # point_local_array = np.array(ee_local_pos)
+        # axis_local_array = np.array(ee_local_axis)
+        # axis_world_array = [0, 0, 1]
+        # # 0.5-0.008, 0.025-0.008, 0.8), (0.5+0.008, 0.025+0.008, 1.
+        # goal_pos_world = [np.random.uniform(0.5-0.008, 0.5+0.008), np.random.uniform(0.025-0.008, 0.025+0.008),
+        #                            np.random.uniform(0.8, 1)]
+        #
+        # axis_world_array = np.array(axis_world_array)
+        # goal_pos_world = np.array(goal_pos_world)
+        # vis.add('ik obj', goal_pos_world, color=(1, 0, 0, 1))
+        # objective = ik.objective(self.robot.link(9),
+        #                                    local=[ee_local_pos, list(point_local_array + h * axis_local_array)],
+        #                                    world=[goal_pos_world, list(goal_pos_world + h * axis_world_array)])
+
+        solved = ik.solve_global(objectives=objective, iters=50, numRestarts=5, activeDofs=[1, 2, 3, 4, 5, 6, 7])
+        print(solved)
         if not solved:
             print('qplace')
             return None
@@ -322,7 +361,8 @@ class PlacePlanner(MultiStepPlanner):
     def solve_transfer(self,qpreplace):
         #TODO: solve for the transfer plan
         self.robot.setConfig(qpreplace)
-        self.qtransfer=retract(self.robot,self.gripper,amount=[0,0,0.3], local=False)
+        # self.qtransfer=retract(self.robot,self.gripper,amount=[0,0,0.3], local=False)
+        self.qtransfer = qpreplace
         if self.qtransfer is None:
             print('qtransfer')
             return None
@@ -360,9 +400,12 @@ class PlacePlanner(MultiStepPlanner):
 
         #TODO: construct the RobotTrajectory tuple (transfer,lower,retract)
         # todo: add a waypoint between qtransfer and qpreplace
+        # return RobotTrajectory(self.robot, milestones=[self.qstart] + transfer), \
+        #        RobotTrajectory(self.robot, milestones=[self.qtransfer, q_rotate, qpreplace, qplace]), \
+        #        RobotTrajectory(self.robot, milestones=[qplace, retract])
         return RobotTrajectory(self.robot, milestones=[self.qstart] + transfer), \
                RobotTrajectory(self.robot, milestones=[self.qtransfer, q_rotate, qpreplace, qplace]), \
-               RobotTrajectory(self.robot, milestones=[qplace, retract])
+               RobotTrajectory(self.robot, milestones=[qplace])
 
 
     def solve_item(self,plan,item):
