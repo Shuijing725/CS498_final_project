@@ -35,6 +35,10 @@
   <rigidObject name="plate" translation="0.8 0.75 0.63" rotateZ="0.0" rotateX="1.57079" rotateY="0.0">
     <geometry file="objects/reaction_plate.dae" scale="1 1 1"/>
   </rigidObject>
+  
+  <rigidObject name="head" translation="0.5 -0.5 1.4" rotateZ="3.14159" rotateX="1.57079" rotateY="0.0">
+    <geometry file="objects/bm_v16_result_full.obj" scale="0.002 0.002 0.002"/>
+  </rigidObject>
 
 
   <!-- the table 1 -->
