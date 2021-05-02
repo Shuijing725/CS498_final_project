@@ -11,6 +11,7 @@ import random
 import sys
 import numpy as np
 import time
+import json
 sys.path.append("../common")
 import grasp
 import grasp_database
@@ -26,6 +27,7 @@ if __name__ == '__main__':
     if not res:
         print("Unable to read file",fn)
         exit(0)
+
 
     #this will perform a reasonable center of mass / inertia estimate
     for i in range(world.numRigidObjects()):
@@ -43,6 +45,15 @@ if __name__ == '__main__':
     #set start configurations
     qstart = resource.get("start.config",world=world)
     robot.setConfig(qstart)
+    qstart2 = resource.get("start2.config",world=world)
+    robot2.setConfig(qstart2)
+    
+    #make copy of the world
+    world_copy = world.copy()
+    robot_copy = world_copy.robot(0)
+    robot2_copy = world_copy.robot(1)
+    gripper_link_copy = robot_copy.link(9)
+    gripper2_link_copy = robot_copy.link(9)
     
     #need to fix the spin joints somewhat
     qmin,qmax = robot.getJointLimits()
@@ -55,17 +66,22 @@ if __name__ == '__main__':
     #load the gripper info and grasp database
     source_gripper = robotiq_85
     target_gripper = robotiq_85_kinova_gen3
-
-    db = grasp_database.GraspDatabase(source_gripper)
-    if not db.load("grasps/robotiq_85_sampled_grasp_db.json"):
-        raise RuntimeError("Can't load grasp database?")
-
-    obj = world.rigidObject('swab')
+    
+    #load grasp poses
+    plate_obj = world.rigidObject('plate')
+    with open("grasps/robotiq_85_reaction_plate_grasp_0.json") as f:
+        plate_grasp_json = json.load(f)
+    plate_grasp = grasp.Grasp()
+    plate_grasp.fromJson(plate_grasp_json)
+    plate_grasp_world = plate_grasp.get_transformed(plate_obj.getTransform()).transfer(source_gripper,target_gripper)
 
     #add the world elements individually to the visualization
     vis.add("world",world)
-
-
+    
+    db = grasp_database.GraspDatabase(source_gripper)
+    if not db.load("grasps/robotiq_85_sampled_grasp_db.json"):
+        raise RuntimeError("Can't load grasp database?")
+    obj = world.rigidObject('swab')
 
     #transform all the grasps to use the kinova arm gripper and object transform
     orig_grasps = db.object_to_grasps["048_hammer"]
@@ -89,14 +105,6 @@ if __name__ == '__main__':
     trajectory_is_transfer = None
     next_item_to_pick = 0
     T_gripper_w = robot.link(9).getTransform()
-    for i in range(robot.numLinks()):
-        print(robot.link(i).getName())
-    vis.add('', vectorops.add(se3.apply_rotation(T_gripper_w, [0, 0, 0.1+0.06]), T_gripper_w[1]), color=[1, 0, 0, 1])
-    # vis.add('tube', (0.5, 0.025, 0.72), c=(0, 1, 0, 1))
-    # vis.add('1', (0.5-0.008, 0.025-0.008, 0.72), c=(0, 1, 0, 1))
-    # vis.add('2', (0.5-0.008, 0.025+0.008, 0.72), c=(0, 1, 0, 1))
-    # vis.add('3', (0.5+0.008, 0.025-0.008, 0.72), c=(0, 1, 0, 1))
-    # vis.add('4', (0.5+0.008, 0.025+0.008, 0.72), c=(0, 1, 0, 1))
 
     def planTriggered():
         global world,robot,obj,target_gripper,grasp, solved_trajectory, trajectory_is_transfer, next_item_to_pick
@@ -196,9 +204,13 @@ if __name__ == '__main__':
         h = 0.1
         plate_axis = plate_R[3:6]
         plate_t[2] += 0.15
-        goal = ik.objective(link,local=[ee_local_pos,vectorops.madd(ee_local_pos,axis_local_array, h)],world=[plate_t,vectorops.madd(plate_t,plate_axis, -h)])
-        ik.solve(goal)
-        robot2_target = robot2.getConfig()
+        #goal = ik.objective(link,local=[ee_local_pos,vectorops.madd(ee_local_pos,axis_local_array, h)],world=[plate_t,vectorops.madd(plate_t,plate_axis, -h)])
+        #goal = plate_grasp_world.ik_constraint
+        #ik.solve(goal)
+        res = pick.plan_pick_one(world_copy,robot2_copy,plate_obj,target_gripper,plate_grasp_world)
+        print(res[2].milestones[0])
+        robot2_target = robot2_copy.getConfig()
+        robot2_target = res[2].milestones[0]
     
     vis.addAction(transferPlate, "Transfer plate", 't')
     
