@@ -47,6 +47,7 @@ def retract(robot,gripper,amount,local=True):
     obj = ik.objective(link,R=Tcur[0],t=vectorops.add(Tcur[1],amount))
     res = ik.solve(obj)
     if not res:
+        print('retract ik failed!')
         return None
     return robot.getConfig()
 
@@ -92,8 +93,14 @@ def feasible_plan(world, robot, object, qtarget):
 
     return path
 
+def clip_angle(num):
+    if num > 2*np.pi:
+        num = num - 2*np.pi
+    elif num < -2*np.pi:
+        num = num + 2*np.pi
+    return num
 
-def plan_pick_one(world,robot,object,gripper,grasp):
+def plan_pick_one(world,robot,object,gripper,grasp, robot0=True):
     """
     Plans a picking motion for a given object and a specified grasp.
 
@@ -131,7 +138,9 @@ def plan_pick_one(world,robot,object,gripper,grasp):
     robot.setConfig(qpregrasp)
     if not feasible(): return None
 
+
     qtransit = retract(robot=robot, gripper=gripper, amount=list(-0.1*np.array(gripper.primary_axis)), local=True)
+
     secondary_axis_gripper = gripper.secondary_axis
     if not isinstance(gripper,(int,str)):
         gripper1 = gripper.base_link
@@ -142,9 +151,15 @@ def plan_pick_one(world,robot,object,gripper,grasp):
     secondary_axis_world = so3.apply(R_gripper_w, secondary_axis_gripper)
     secondary_axis_world_2d = np.array(secondary_axis_world)[:-1]
     angle = np.arccos(np.dot(secondary_axis_world_2d, [0, 1]))
+    # angle = np.pi/4
     q_rotate = copy.deepcopy(qtransit)
-    q_rotate[7] = q_rotate[7] - angle
-    qpregrasp[7] = qpregrasp[7] - angle
+    if not robot0:
+        angle = -angle
+    q_rotate[7] = clip_angle(q_rotate[7] - angle)
+    qpregrasp[7] = clip_angle(qpregrasp[7] - angle)
+
+
+
 
     if qtransit is None: return None
     print(qtransit)
@@ -159,10 +174,16 @@ def plan_pick_one(world,robot,object,gripper,grasp):
     if not feasible(): return None
 
     # robot.setConfig(qopen)
-    qgrasp = gripper.set_finger_config(qopen, gripper.partway_open_config(0.1)) # close the gripper
+    if robot0:
+        close_amount = 0.1
+    else:
+        close_amount = 0.8
+    qgrasp = gripper.set_finger_config(qopen, gripper.partway_open_config(close_amount)) # close the gripper
 
     robot.setConfig(qgrasp)
+    # todo: bring back this
     qlift = retract(robot=robot, gripper=gripper, amount=[0, 0, 0.1], local=False)
+    # qlift = copy.deepcopy(qgrasp)
     robot.setConfig(qlift)
     if not feasible(): return None
 
@@ -171,7 +192,8 @@ def plan_pick_one(world,robot,object,gripper,grasp):
     if not transit:
         return None
 
-    return RobotTrajectory(robot,milestones=[qstart]+transit),RobotTrajectory(robot,milestones=[qtransit, q_rotate, qpregrasp, qopen, qgrasp]),\
+    return RobotTrajectory(robot,milestones=[qstart]+transit),\
+           RobotTrajectory(robot,milestones=[qtransit, q_rotate, qpregrasp, qopen, qgrasp]),\
            RobotTrajectory(robot,milestones=[qgrasp,qlift])
 
 
