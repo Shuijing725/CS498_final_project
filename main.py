@@ -1,6 +1,6 @@
 from klampt import WorldModel,Simulator
 from klampt.io import resource
-from klampt.model import ik
+from klampt.model import ik,sensing
 from klampt import vis
 from klampt.model.trajectory import Trajectory,RobotTrajectory,path_to_trajectory
 from klampt.math import vectorops,so3,se3
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     robot = world.robot(0)
     robot2 = world.robot(1)
     gripper_link = robot.link(9)
-    gripper2_link = robot.link(9)
+    gripper2_link = robot2.link(9)
     
     #set start configurations
     qstart = resource.get("start.config",world=world)
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     robot_copy = world_copy.robot(0)
     robot2_copy = world_copy.robot(1)
     gripper_link_copy = robot_copy.link(9)
-    gripper2_link_copy = robot_copy.link(9)
+    gripper2_link_copy = robot2_copy.link(9)
     
     #need to fix the spin joints somewhat
     qmin,qmax = robot.getJointLimits()
@@ -61,6 +61,12 @@ if __name__ == '__main__':
             qmin[i] = -float('inf')
             qmax[i] = float('inf')
     robot.setJointLimits(qmin,qmax)
+    qmin,qmax = robot2.getJointLimits()
+    for i in range(len(qmin)):
+        if qmax[i] - qmin[i] > math.pi*2:
+            qmin[i] = -float('inf')
+            qmax[i] = float('inf')
+    robot2.setJointLimits(qmin,qmax)
     
     #load the gripper info and grasp database
     source_gripper = robotiq_85
@@ -78,17 +84,16 @@ if __name__ == '__main__':
     vis.add("world",world)
     
     sim = Simulator(world)
-    ctrl = sim.controller(0)
-    print(ctrl)
-    sensor = ctrl.sensor("realsense")
-    measurement = sensor.getMeasurements()
-    print(measurement)
-    raise
-    #print(sensor.getSetting("link"))
-    #print(sensor.getSetting("Tsensor"))
+    sim_dt = 0.02
+    sensor = sim.controller(0).sensor("realsense")
+    sensor2 = sim.controller(0).sensor("realsense")
+    
+    #T = (so3.sample(),[0,0,1.0])
+    #T = (so3.mul(so3.rotation([1,0,0],math.radians(-10)),[1,0,0, 0,0,-1,  0,1,0]),[0,-2.0,0.5])
+    #sensing.set_sensor_xform(sensor,T,link=-1)
     vis.add("sensor",sensor)
     
-    
+
     db = grasp_database.GraspDatabase(source_gripper)
     if not db.load("grasps/robotiq_85_sampled_grasp_db.json"):
         raise RuntimeError("Can't load grasp database?")
@@ -139,6 +144,8 @@ if __name__ == '__main__':
     # vis.add('2', (0.5-0.008, 0.025+0.008, 0.72), c=(0, 1, 0, 1))
     # vis.add('3', (0.5+0.008, 0.025-0.008, 0.72), c=(0, 1, 0, 1))
     # vis.add('4', (0.5+0.008, 0.025+0.008, 0.72), c=(0, 1, 0, 1))
+    
+
 
     def planTriggered():
         global world,robot, robot2, swab,target_gripper,grasp_swab, grasp_plate, solved_trajectory, \
@@ -293,15 +300,17 @@ if __name__ == '__main__':
         robot2_target = res[2].milestones[0]
     
     vis.addAction(transferPlate, "Transfer plate", 't')
-
-    sim = Simulator(world)
-    sim_dt = 0.02
+    
     was_grasping = False
 
 
     def loop_callback():
         global was_grasping, Tobject_grasp, solved_trajectory, trajectory_is_transfer, executing_plan, \
             execute_start_time, qstart, next_robot_to_move
+            
+        global sensor
+        sensor.kinematicReset()
+        sensor.kinematicSimulate(world,0.01)
         # global robot2_target
         # if robot2_target is not None:
         #     robot2.setConfig(robot2_target)
