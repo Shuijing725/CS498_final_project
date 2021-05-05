@@ -77,6 +77,17 @@ if __name__ == '__main__':
     #add the world elements individually to the visualization
     vis.add("world",world)
     
+    sim = Simulator(world)
+    ctrl = sim.controller(0)
+    print(ctrl)
+    sensor = ctrl.sensor("realsense")
+    measurement = sensor.getMeasurements()
+    print(measurement)
+    raise
+    #print(sensor.getSetting("link"))
+    #print(sensor.getSetting("Tsensor"))
+    vis.add("sensor",sensor)
+    
     
     db = grasp_database.GraspDatabase(source_gripper)
     if not db.load("grasps/robotiq_85_sampled_grasp_db.json"):
