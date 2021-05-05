@@ -11,7 +11,7 @@ import random
 import sys
 import numpy as np
 import time
-import copy
+import json
 sys.path.append("../common")
 import grasp
 import grasp_database
@@ -28,31 +28,32 @@ if __name__ == '__main__':
         print("Unable to read file",fn)
         exit(0)
 
+    #this will perform a reasonable center of mass / inertia estimate
     for i in range(world.numRigidObjects()):
         obj = world.rigidObject(i)
-        #this will perform a reasonable center of mass / inertia estimate
         m = obj.getMass()
-        m.estimate(obj.geometry(),mass=0.454,surfaceFraction=0.2)
+        m.estimate(obj.geometry(),mass=1,surfaceFraction=1)
         obj.setMass(m)
-
-    plate_mass = world.rigidObject("plate").getMass()
-    plate_mass.setInertia([1,0,0,0,1,0,0,0,1])
-    world.rigidObject("plate").setMass(plate_mass)
-    plate_mass = world.rigidObject("pcr").getMass()
-    plate_mass.setInertia([1,0,0,0,1,0,0,0,1])
-    world.rigidObject("pcr").setMass(plate_mass)
-    
-    #load the gripper info and grasp database
-    source_gripper = robotiq_85
-    target_gripper = robotiq_85_kinova_gen3
-
-    db = grasp_database.GraspDatabase(source_gripper)
-    if not db.load("grasps/robotiq_85_sampled_grasp_db.json"):
-        raise RuntimeError("Can't load grasp database?")
-
+        
+    #get gripper base link
     robot = world.robot(0)
     robot2 = world.robot(1)
     gripper_link = robot.link(9)
+    gripper2_link = robot.link(9)
+    
+    #set start configurations
+    qstart = resource.get("start.config",world=world)
+    robot.setConfig(qstart)
+    qstart2 = resource.get("start2.config",world=world)
+    robot2.setConfig(qstart2)
+    
+    #make copy of the world
+    world_copy = world.copy()
+    robot_copy = world_copy.robot(0)
+    robot2_copy = world_copy.robot(1)
+    gripper_link_copy = robot_copy.link(9)
+    gripper2_link_copy = robot_copy.link(9)
+    
     #need to fix the spin joints somewhat
     qmin,qmax = robot.getJointLimits()
     for i in range(len(qmin)):
@@ -60,15 +61,29 @@ if __name__ == '__main__':
             qmin[i] = -float('inf')
             qmax[i] = float('inf')
     robot.setJointLimits(qmin,qmax)
-
-    swab = world.rigidObject('swab')
-    plate = world.rigidObject('plate')
+    
+    #load the gripper info and grasp database
+    source_gripper = robotiq_85
+    target_gripper = robotiq_85_kinova_gen3
+    
+    #load grasp poses
+    plate_obj = world.rigidObject('plate')
+    with open("grasps/robotiq_85_reaction_plate_grasp_0.json") as f:
+        plate_grasp_json = json.load(f)
+    plate_grasp = grasp.Grasp()
+    plate_grasp.fromJson(plate_grasp_json)
+    plate_grasp_world = plate_grasp.get_transformed(plate_obj.getTransform()).transfer(source_gripper,target_gripper)
 
     #add the world elements individually to the visualization
     vis.add("world",world)
-    qstart = resource.get("start.config",world=world)
-    robot.setConfig(qstart)
-    robot2.setConfig(qstart)
+    
+    
+    db = grasp_database.GraspDatabase(source_gripper)
+    if not db.load("grasps/robotiq_85_sampled_grasp_db.json"):
+        raise RuntimeError("Can't load grasp database?")
+
+    swab = world.rigidObject('swab')
+    plate = world.rigidObject('plate')
 
     #transform all the grasps to use the kinova arm gripper and object transform
     orig_grasps = db.object_to_grasps["048_hammer"]
@@ -255,23 +270,18 @@ if __name__ == '__main__':
         plate_obj = world.rigidObject("plate")
         plate_xform = plate_obj.getTransform()
         plate_R, plate_t = plate_xform
-        link = robot.link('EndEffector_Link')
-        # goal = grasp_plate.ik_constraint
-        h = 0.1
-        goal = (0.1, 0.5, 0.8)
+        link = robot2.link('EndEffector_Link')
         ee_local_pos = (0, 0, 0)
-        # we want the end effector to grasp from top of the object
-        ee_local_axis = source_gripper.primary_axis  # (1, 0, 0)
-
-        point_local_array = np.array(ee_local_pos)
-        axis_local_array = np.array(ee_local_axis)
-        axis_world_array = np.array([0, 0, -1])
-        objective = ik.objective(link, R=so3.from_rpy((-np.pi/2, 0, -np.pi/2)), t=list(np.array(goal)-np.array([0.16, 0, 0])))
-        ik.solve_global(objectives=objective, iters=50, numRestarts=5, activeDofs=[1, 2, 3, 4, 5, 6, 7])
-        # robot2_target = robot.getConfig()
+        ee_local_axis = (1, 0, 0)
+        h = 0.1
+        plate_axis = plate_R[3:6]
+        plate_t[2] += 0.15
+        res = pick.plan_pick_one(world_copy,robot2_copy,plate_obj,target_gripper,plate_grasp_world)
+        print(res[2].milestones[0])
+        robot2_target = robot2_copy.getConfig()
+        robot2_target = res[2].milestones[0]
     
     vis.addAction(transferPlate, "Transfer plate", 't')
-    # vis.addAction(executePlan, "Execute plan", 'f')
 
     sim = Simulator(world)
     sim_dt = 0.02
