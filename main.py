@@ -1,6 +1,6 @@
 from klampt import WorldModel,Simulator
 from klampt.io import resource
-from klampt.model import ik
+from klampt.model import ik,sensing
 from klampt import vis
 from klampt.model.trajectory import Trajectory,RobotTrajectory,path_to_trajectory
 from klampt.math import vectorops,so3,se3
@@ -12,6 +12,7 @@ import sys
 import numpy as np
 import time
 import copy
+import json
 sys.path.append("../common")
 import grasp
 import grasp_database
@@ -60,7 +61,12 @@ if __name__ == '__main__':
             qmin[i] = -float('inf')
             qmax[i] = float('inf')
     robot.setJointLimits(qmin,qmax)
-
+    qmin, qmax = robot2.getJointLimits()
+    for i in range(len(qmin)):
+        if qmax[i] - qmin[i] > math.pi * 2:
+            qmin[i] = -float('inf')
+            qmax[i] = float('inf')
+    robot2.setJointLimits(qmin, qmax)
     swab = world.rigidObject('swab')
     plate = world.rigidObject('plate')
 
@@ -69,6 +75,8 @@ if __name__ == '__main__':
     qstart = resource.get("start.config",world=world)
     robot.setConfig(qstart)
     robot2.setConfig(qstart)
+
+
 
     #transform all the grasps to use the kinova arm gripper and object transform
     orig_grasps = db.object_to_grasps["048_hammer"]
@@ -120,11 +128,14 @@ if __name__ == '__main__':
         if next_robot_to_move == 0:
             Tobj0 = swab.getTransform()
             # center of tube: (0.5 0.025 0.72)
-            goal_bounds = [(0.6 - 0.008, 0.025 - 0.008, 0.85), (0.6 + 0.008, 0.025 + 0.008, 1.0)]
+            offset = 0.005
+            goal_bounds = [(0.615 - offset, 0.025 - offset/4, 0.85), (0.615 + offset, 0.025 +offset/4, 1.0)]
+            # goal_bounds = [(0.6 - 0.008, 0.025 - 0.008, 0.), (0.6 + 0.008, 0.025 + 0.008, 1.0)]
             # vis.add('goal bound 0', goal_bounds[0], c=(0, 1, 0, 1))
             # vis.add('goal bound 1', goal_bounds[1], c=(0, 1, 0, 1))
             qstart = robot.getConfig()
             res = pick.plan_pick_one(world, robot, swab, target_gripper, grasp_swab, robot0=True)
+
             if res is None:
                 print("Unable to plan pick")
             else:
@@ -140,7 +151,7 @@ if __name__ == '__main__':
                 Tobject_grasp = se3.mul(se3.inv(gripper_link.getTransform()), Tobj)
                 place.robot0 = True
                 res = place.plan_place(world, robot, swab, Tobject_grasp, target_gripper, goal_bounds, True)
-
+                robot.setConfig(qstart)
                 if res is None:
                     print("Unable to plan place")
                 else:
@@ -174,7 +185,7 @@ if __name__ == '__main__':
         elif next_robot_to_move == 1:
             Tobj0 = plate.getTransform()
             goal_bounds = [(0.7, 0.62, 0.71), (0.7, 0.62, 0.71)]
-
+            qstart = robot.getConfig()
             res = pick.plan_pick_one(world, robot2, plate, target_gripper, grasp_plate, robot0=False)
             if res is None:
                 print("Unable to plan pick")
@@ -189,6 +200,7 @@ if __name__ == '__main__':
                 Tobject_grasp = se3.mul(se3.inv(robot2.link(9).getTransform()), Tobj)
                 place.robot0 = False
                 res = place.plan_place(world, robot2, plate, Tobject_grasp, target_gripper, goal_bounds, False)
+                # robot.setConfig(qstart)
                 if res is None:
                     print("Unable to plan place")
                 else:
@@ -269,18 +281,30 @@ if __name__ == '__main__':
         objective = ik.objective(link, R=so3.from_rpy((-np.pi/2, 0, -np.pi/2)), t=list(np.array(goal)-np.array([0.16, 0, 0])))
         ik.solve_global(objectives=objective, iters=50, numRestarts=5, activeDofs=[1, 2, 3, 4, 5, 6, 7])
         # robot2_target = robot.getConfig()
-    
+
     vis.addAction(transferPlate, "Transfer plate", 't')
     # vis.addAction(executePlan, "Execute plan", 'f')
 
     sim = Simulator(world)
     sim_dt = 0.02
+    sensor = sim.controller(0).sensor("realsense")
+    sensor2 = sim.controller(0).sensor("realsense")
+
+    vis.add("sensor", sensor)
     was_grasping = False
 
 
+    swab_time = 0
+    swab_init_height = 0
+    swab_height = 0
+
     def loop_callback():
         global was_grasping, Tobject_grasp, solved_trajectory, trajectory_is_transfer, executing_plan, \
-            execute_start_time, qstart, next_robot_to_move
+            execute_start_time, qstart, next_robot_to_move, swab_time, swab_init_height, swab_height
+
+        global sensor
+        sensor.kinematicReset()
+        sensor.kinematicSimulate(world,0.01)
         # global robot2_target
         # if robot2_target is not None:
         #     robot2.setConfig(robot2_target)
@@ -318,10 +342,22 @@ if __name__ == '__main__':
                 cur_obj.setTransform(*se3.mul(cur_robot.link(9).getTransform(), Tobject_grasp))
             else:
                 was_grasping = False
-        if t > solved_trajectory.duration():
+        if t > solved_trajectory.duration()-0.8:
+            swab_init_height = swab.getTransform()[1][2]
+            swab_height = copy.deepcopy(swab_init_height)
+        if t > solved_trajectory.duration() + 1:
             executing_plan = False
             solved_trajectory = None
             vis.add('gripper end', cur_robot.link(9).getTransform())
             next_robot_to_move += 1
+        # let swab drop into trash can
+        if solved_trajectory is not None and next_robot_to_move == 0:
+            if solved_trajectory.duration()-0.8 < t < solved_trajectory.duration() + 1:
+                if swab_height > 0:
+                    swab_height = swab_init_height - 0.5 * 1 * swab_time**2
+                    swab_time = swab_time + sim_dt
+                Rs, ts = swab.getTransform()
+                ts[2] = swab_height
+                swab.setTransform(Rs, ts)
 
     vis.loop(callback=loop_callback)

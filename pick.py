@@ -153,8 +153,8 @@ def plan_pick_one(world,robot,object,gripper,grasp, robot0=True):
     angle = np.arccos(np.dot(secondary_axis_world_2d, [0, 1]))
     # angle = np.pi/4
     q_rotate = copy.deepcopy(qtransit)
-    if not robot0:
-        angle = -angle
+    # if not robot0:
+    #     angle = -angle
     q_rotate[7] = clip_angle(q_rotate[7] - angle)
     qpregrasp[7] = clip_angle(qpregrasp[7] - angle)
 
@@ -181,9 +181,9 @@ def plan_pick_one(world,robot,object,gripper,grasp, robot0=True):
     qgrasp = gripper.set_finger_config(qopen, gripper.partway_open_config(close_amount)) # close the gripper
 
     robot.setConfig(qgrasp)
-    # todo: bring back this
+
     qlift = retract(robot=robot, gripper=gripper, amount=[0, 0, 0.1], local=False)
-    # qlift = copy.deepcopy(qgrasp)
+
     robot.setConfig(qlift)
     if not feasible(): return None
 

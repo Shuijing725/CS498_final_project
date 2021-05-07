@@ -45,3 +45,5 @@ servoD  0.2
 
 dryFriction 0
 viscousFriction 0.3
+
+property sensors <sensors> <CameraSensor name="realsense" link="Link_0" Tsensor="0 1 0  -1 0 0  0 0 1   0 0.1 0"  xres="256" yres="128" xfov="1.05" yfov="0.6" zmin="0.4" zresolution="0.01" zvarianceLinear="0.00001" /> </sensors>
