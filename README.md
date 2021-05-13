@@ -2,7 +2,7 @@
 This repository contains the codes for our final project titled COVID Testing Robot for CS 498IR, taught by Kris Hauser in University of Illinois Urbana Champaign in Spring 2021. 
 For experiment demonstrations, please refer to the [youtube video](https://www.youtube.com/watch?v=H_gwcFDu2kw).
 
-<img src="/figures/setup.png" width="450" />
+<img src="/figures/setup.png" width="600" />
 
 ## Introduction
 COVID-19 has been spreading for more than a year. Around 1.5M COVID tests are conducted daily in US.
