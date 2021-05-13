@@ -5,8 +5,7 @@
   <terrain file="objects/cube.off" scale="0.3 0.3 0.59" translation="-0.15 -0.15 0.0">
      <display color="0.2 0.2 0.2"/>
   </terrain>
-  
-<!--  <robot name="Kinova2" file="robot/kinova_with_robotiq_85.urdf" translation="1.3 0.6 0.6" rotateZ="3.14159"/>-->
+
   <robot name="Kinova2" file="robot/kinova_with_robotiq_85.urdf" translation="0.2 0.5 0.6"/>
   <!-- the pedestal 2 -->
   <terrain file="objects/cube.off" scale="0.3 0.3 0.59" translation="0.05 0.35 0.0">
@@ -38,7 +37,7 @@
     <geometry file="objects/reaction_plate.ply" scale="0.35 0.35 0.35"/>
   </rigidObject>
 
-  <rigidObject name="head" translation="0.5 -0.5 1.4" rotateZ="3.14159" rotateX="1.57079" rotateY="0.0">
+  <rigidObject name="head" translation="0.5 -0.5 1.1" rotateZ="3.14159" rotateX="1.57079" rotateY="0.0">
     <geometry file="objects/bm_v16_result_full.obj" scale="0.002 0.002 0.002"/>
   </rigidObject>
 

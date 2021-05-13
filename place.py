@@ -51,14 +51,9 @@ def transfer_plan(world,robot,qtarget,object,Tobject_gripper):
             idx = robot1.link(i).getIndex()
             finger_pad_links_idx.append(idx)
 
-        # set object to correct (R, t) in world frame
-        # vis.add('object transform:', object.getTransform())
-        # vis.add('Tobject_gripper', Tobject_gripper)
-        # Tworld_gripper = robot1.link(gripper_link).getTransform()
         Tworld_gripper = gripper_link1.getTransform()
         Tworld_object = se3.mul(Tworld_gripper, Tobject_gripper)
         object.setTransform(Tworld_object[0], Tworld_object[1])
-        # vis.add('T world object', Tworld_object)
 
         # self collide
         if robot1.selfCollides():
@@ -135,6 +130,7 @@ class PlacePlanner(MultiStepPlanner):
         object (RigidObjectModel): the object to pick.
         Tobject_gripper (se3 object): transform of the object with respect to the gripper..
         goal_bounds (list): bounds of the goal region [(xmin,ymin,zmin,(xmax,ymax,zmax)]
+        robot0: whether we are planning for the first robot (True) or the second robot (False)
 
     Returns:
         None or (transfer,lower,ungrasp): giving the components of the place motion.
@@ -165,29 +161,13 @@ class PlacePlanner(MultiStepPlanner):
         self.world1.remove(self.world1.rigidObject(self.object.index))
         # find the robot in world1
         self.robot1 = self.world1.robot(0)
-        # find the gripper link in new world????
+        # find the gripper link in new world
         self.gripper_link1 = self.robot1.link(9)
 
         if self.robot0:
             self.close_amount = 0.1
         else:
             self.close_amount = 0.8
-
-
-    def object_free(self,q):
-        """Helper: returns true if the object is collision free at configuration q, if it is
-        attached to the gripper."""
-        self.robot.setConfig(q)
-        gripper_link = self.robot.link(self.gripper.base_link)
-        self.object.setTransform(*se3.mul(gripper_link.getTransform(),self.Tobject_gripper))
-        for i in range(self.world.numTerrains()):
-            if self.object.geometry().collides(self.world.terrain(i).geometry()):
-                return False
-        for i in range(self.world.numRigidObjects()):
-            if i == self.object.index: continue
-            if self.object.geometry().collides(self.world.rigidObject(i).geometry()):
-                return False
-        return True
 
     def check_feasible(self):
         for i in range(self.world.numTerrains()):
@@ -203,12 +183,10 @@ class PlacePlanner(MultiStepPlanner):
                 return False
         return True
 
+    # Input: goal_bounds (list): bounds of the goal region [(xmin,ymin,zmin,(xmax,ymax,zmax)]
+    # Output: a list of object transforms (R, t) that represent valid placement poses of the object
     def solve_placement(self, goal_bounds):
         """Implemented for you: come up with a collision-free target placement"""
-        # obmin,obmax = self.objbb
-        # ozmin = obmin[2]
-        # min_dims = min(obmax[0]-obmin[0],obmax[1]-obmin[1])
-        # center = [0.5*(obmax[0]+obmin[0]),0.5*(obmax[1]-obmin[1])]
         xmin,ymin,zmin = goal_bounds[0]
         xmax,ymax,zmax = goal_bounds[1]
         #center_sampling_range = [(xmin+min_dims/2,xmax-min_dims/2),(ymin+min_dims/2,ymax-min_dims/2)]
@@ -217,18 +195,15 @@ class PlacePlanner(MultiStepPlanner):
         original_obj_tarnsform=self.object.getTransform()
         for iters in range(20):
             crand = [random.uniform(b[0],b[1]) for b in center_sampling_range]
-            #Robj = so3.rotation((0,0,1),random.uniform(0,math.pi*2))
-            # Robj=so3.identity()
+
             if self.robot0:
                 Robj = so3.from_rpy((0, np.pi/2, 0))
             else:
-                Robj = so3.identity()# so3.from_rpy((0, 0, np.pi/2))
-            #tobj = vectorops.add(so3.apply(Robj,[-center[0],-center[1],0]),[crand[0],crand[1],zmin-ozmin+0.002])
+                Robj = so3.identity()
+
             tobj=[crand[0], crand[1], crand[2]]
 
-
             self.object.setTransform(Robj,tobj)
-            # vis.add("abdbdbd", tobj)
 
             if not self.check_feasible():
                 continue
@@ -241,9 +216,8 @@ class PlacePlanner(MultiStepPlanner):
         return Tobj_feasible
 
 
-
+    # callback function for checking whether the robot is collision-free, to be used in ik solver
     def feasible(self):
-        # collision check function
         finger_pad_links = ['gripper:Link_4', 'gripper:Link_6']
 
         finger_pad_links_idx = []
@@ -252,8 +226,6 @@ class PlacePlanner(MultiStepPlanner):
             finger_pad_links_idx.append(idx)
 
         # set object to correct (R, t) in world frame
-
-        # Tworld_gripper = robot1.link(gripper_link).getTransform()
         Tworld_gripper = self.gripper_link1.getTransform()
         Tworld_object = se3.mul(Tworld_gripper, self.Tobject_gripper)
         self.object.setTransform(Tworld_object[0], Tworld_object[1])
@@ -265,6 +237,7 @@ class PlacePlanner(MultiStepPlanner):
             return False
         # collision between object and robot
         for i in range(self.robot1.numLinks()):
+            # ignore the collisions between finger links and the object to grasp
             if i in finger_pad_links_idx:
                 continue
             if self.robot1.link(i).geometry().collides(self.object.geometry()):
@@ -294,11 +267,10 @@ class PlacePlanner(MultiStepPlanner):
                 return False
         return True
 
+    # given a desired placement pose of the target object (Tplacement), find a placement configuration for the robot
     def solve_qplace(self,Tplacement):
         if self.robot0:
-            # vis.add('goal t', Tplacement[1], color=[1, 0, 0, 1])
             v = list(np.array(Tplacement[1]) - np.array([0.16, 0, 0]))
-            print('height:', v[2])
             objective = ik.objective(self.robot.link(9), R=Tplacement[0], t=v)
             solved = ik.solve_global(objectives=objective, iters=50, numRestarts=5, activeDofs=[1, 2, 3, 4, 5, 6, 7],
                                      feasibilityCheck=self.feasible)
@@ -307,7 +279,28 @@ class PlacePlanner(MultiStepPlanner):
                 print('qplace')
                 return None
             qpreplace = self.robot.getConfig()
-            # qpreplace = self.gripper.set_finger_config(qpreplace, self.gripper.partway_open_config(self.close_amount))
+
+            # add a waypoint to insert swab into human face
+            face_trans = [0.34, -0.3, 1.05]# [0.5, -0.35, 1.35]
+            objective = ik.objective(self.robot.link(9), R=so3.from_rpy((np.pi, -np.pi/2, 0)), t=face_trans)
+            solved = ik.solve_global(objectives=objective, iters=50, numRestarts=5, activeDofs=[1, 2, 3, 4, 5, 6, 7],
+                                     feasibilityCheck=self.feasible)
+            if not solved:
+                print('cannot place swab near mouth')
+                return None
+            self.qmouth = self.robot.getConfig()
+            self.qmouth = self.gripper.set_finger_config(self.qmouth,
+                                                         self.gripper.partway_open_config(self.close_amount))
+
+            face_trans = [0.34, -0.4, 1.05]  # [0.5, -0.35, 1.35]
+            objective = ik.objective(self.robot.link(9), R=so3.from_rpy((np.pi, -np.pi/2, 0)), t=face_trans)
+            solved = ik.solve_global(objectives=objective, iters=50, numRestarts=5, activeDofs=[1, 2, 3, 4, 5, 6, 7])
+            if not solved:
+                print('cannot insert swab into mouth')
+                return None
+            self.qmouth_in = self.robot.getConfig()
+            self.qmouth_in = self.gripper.set_finger_config(self.qmouth_in,
+                                                         self.gripper.partway_open_config(self.close_amount))
 
             # add a waypoint to lower down the gripper
             v1 = list(np.array(v)-np.array([0, 0, 0.1]))
@@ -324,8 +317,6 @@ class PlacePlanner(MultiStepPlanner):
 
             # add waypoints to dip the swab into the plate
             goal = (0.7, 0.35, 0.9)
-            # vis.add('goal', goal)
-            # vis.add('goal gripper', list(np.array(goal)-np.array([0.16, 0, 0])))
             t = list(np.array(goal)-np.array([0.16, 0, 0]))
             objective = ik.objective(self.robot.link(9), R=so3.from_rpy((-np.pi/2, np.pi/2, -np.pi/2)), t=t)
             solved = ik.solve_global(objectives=objective, iters=50, numRestarts=5, activeDofs=[1, 2, 3, 4, 5, 6, 7],
@@ -399,12 +390,10 @@ class PlacePlanner(MultiStepPlanner):
         if not self.feasible(): return None
 
         return qretract
-        # return qplace
 
     def solve_transfer(self,qpreplace):
         #TODO: solve for the transfer plan
         self.robot.setConfig(qpreplace)
-        # self.qtransfer=retract(self.robot,self.gripper,amount=[0,0,0.3], local=False)
         self.qtransfer = copy.deepcopy(qpreplace)
         if self.qtransfer is None:
             print('qtransfer')
@@ -412,7 +401,10 @@ class PlacePlanner(MultiStepPlanner):
 
         self.robot.setConfig(self.qtransfer)
         if not self.feasible(): return None
-        self.robot.setConfig(self.qstart)
+        if self.robot0:
+            self.robot.setConfig(self.qmouth)
+        else:
+            self.robot.setConfig(self.qstart)
         transfer = transfer_plan(self.world, self.robot, self.qtransfer, self.object, self.Tobject_gripper)
 
         return transfer
@@ -424,7 +416,6 @@ class PlacePlanner(MultiStepPlanner):
         retract = plan['retract']
 
         #TODO: construct the RobotTrajectory tuple (transfer,lower,retract)
-        # todo: add a waypoint between qtransfer and qpreplace
         if self.robot0:
             angle = -np.pi / 2
             q_rotate = copy.deepcopy(self.qtransfer)
@@ -439,22 +430,18 @@ class PlacePlanner(MultiStepPlanner):
             self.robot.setConfig(qpreplace)
             self.lower_plan = transfer_plan(self.world, self.robot, self.qlower, self.object, self.Tobject_gripper)
 
-            return RobotTrajectory(self.robot, milestones=[self.qstart] + transfer), \
+            return RobotTrajectory(self.robot, milestones=[self.qstart, self.qmouth, self.qmouth_in, self.qmouth] + transfer), \
                    RobotTrajectory(self.robot,
                                    milestones=[self.qtransfer, q_rotate] + self.lower_plan + self.lower_plan[::-1]+
                                                [self.qplaceplate,self.qplaceplate_lower, self.qplaceplate, self.qplace_trash,
                                                self.qplace]), \
                    RobotTrajectory(self.robot, milestones=[self.qplace])
+
         else:
-            # plan a path between qtransfer and qpreplace
-            # self.robot.setConfig(self.qtransfer)
-            # plan = transfer_plan(self.world, self.robot, qpreplace, self.object, self.Tobject_gripper)
             return RobotTrajectory(self.robot, milestones=[self.qstart] + transfer), \
                    RobotTrajectory(self.robot, milestones=[self.qtransfer, qpreplace, qplace]), \
                    RobotTrajectory(self.robot, milestones=[qplace, retract])
-            # return RobotTrajectory(self.robot, milestones=[self.qstart] + transfer), \
-            #        RobotTrajectory(self.robot, milestones=plan+[qplace]), \
-            #        RobotTrajectory(self.robot, milestones=[qplace, retract])
+
 
 
 

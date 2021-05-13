@@ -141,6 +141,8 @@ def plan_pick_one(world,robot,object,gripper,grasp, robot0=True):
 
     qtransit = retract(robot=robot, gripper=gripper, amount=list(-0.1*np.array(gripper.primary_axis)), local=True)
 
+    # rotate the gripper along its primary axis to make its secondary axis perpendicular to the object
+    # so that it can grasp the object easily
     secondary_axis_gripper = gripper.secondary_axis
     if not isinstance(gripper,(int,str)):
         gripper1 = gripper.base_link
@@ -151,10 +153,7 @@ def plan_pick_one(world,robot,object,gripper,grasp, robot0=True):
     secondary_axis_world = so3.apply(R_gripper_w, secondary_axis_gripper)
     secondary_axis_world_2d = np.array(secondary_axis_world)[:-1]
     angle = np.arccos(np.dot(secondary_axis_world_2d, [0, 1]))
-    # angle = np.pi/4
     q_rotate = copy.deepcopy(qtransit)
-    # if not robot0:
-    #     angle = -angle
     q_rotate[7] = clip_angle(q_rotate[7] - angle)
     qpregrasp[7] = clip_angle(qpregrasp[7] - angle)
 
@@ -173,7 +172,7 @@ def plan_pick_one(world,robot,object,gripper,grasp, robot0=True):
     robot.setConfig(qopen)
     if not feasible(): return None
 
-    # robot.setConfig(qopen)
+
     if robot0:
         close_amount = 0.1
     else:

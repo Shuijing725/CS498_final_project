@@ -18,6 +18,7 @@ import grasp
 import grasp_database
 from known_grippers import *
 
+# physics simulation doesn't work for now, set it to False!
 PHYSICS_SIMULATION = False
 
 if __name__ == '__main__':
@@ -31,7 +32,7 @@ if __name__ == '__main__':
 
     for i in range(world.numRigidObjects()):
         obj = world.rigidObject(i)
-        #this will perform a reasonable center of mass / inertia estimate
+        # this will perform a reasonable center of mass / inertia estimate
         m = obj.getMass()
         m.estimate(obj.geometry(),mass=0.454,surfaceFraction=0.2)
         obj.setMass(m)
@@ -43,7 +44,7 @@ if __name__ == '__main__':
     plate_mass.setInertia([1,0,0,0,1,0,0,0,1])
     world.rigidObject("pcr").setMass(plate_mass)
     
-    #load the gripper info and grasp database
+    # load the gripper info and grasp database
     source_gripper = robotiq_85
     target_gripper = robotiq_85_kinova_gen3
 
@@ -91,8 +92,6 @@ if __name__ == '__main__':
     ee_local_pos = (0, 0, 0)
     # we want the end effector to grasp from top of the object
     ee_local_axis = source_gripper.primary_axis # (1, 0, 0)
-    # vis.add('origin', (0, 0, 0), color=(0, 1, 0, 1))
-    # vis.add('ee local axis', ee_local_axis, color=(0, 1, 0, 1))
     point_local_array = np.array(ee_local_pos)
     axis_local_array = np.array(ee_local_axis)
     axis_world_array = np.array([0, 0, -1])
@@ -111,28 +110,18 @@ if __name__ == '__main__':
     trajectory_is_transfer = None
     next_robot_to_move = 0
     T_gripper_w = robot.link(9).getTransform()
-    # for i in range(robot.numLinks()):
-    #     print(robot.link(i).getName())
-    # vis.add('', vectorops.add(se3.apply_rotation(T_gripper_w, [0, 0, 0.1+0.06]), T_gripper_w[1]), color=[1, 0, 0, 1])
-    # vis.add('T obj', obj.getTransform())
-    # vis.add('T world', (so3.identity(), [0, 0, 1]))
-    # vis.add('tube', (0.5, 0.025, 0.72), c=(0, 1, 0, 1))
-    # vis.add('1', (0.5-0.008, 0.025-0.008, 0.72), c=(0, 1, 0, 1))
-    # vis.add('2', (0.5-0.008, 0.025+0.008, 0.72), c=(0, 1, 0, 1))
-    # vis.add('3', (0.5+0.008, 0.025-0.008, 0.72), c=(0, 1, 0, 1))
-    # vis.add('4', (0.5+0.008, 0.025+0.008, 0.72), c=(0, 1, 0, 1))
 
+    # Plan paths for the two robots
     def planTriggered():
         global world,robot, robot2, swab,target_gripper,grasp_swab, grasp_plate, solved_trajectory, \
             trajectory_is_transfer, next_robot_to_move
+        ########################## Plan for robot0 & swab ############################
         if next_robot_to_move == 0:
+            # plan pick
             Tobj0 = swab.getTransform()
             # center of tube: (0.5 0.025 0.72)
             offset = 0.005
             goal_bounds = [(0.615 - offset, 0.025 - offset/4, 0.85), (0.615 + offset, 0.025 +offset/4, 1.0)]
-            # goal_bounds = [(0.6 - 0.008, 0.025 - 0.008, 0.), (0.6 + 0.008, 0.025 + 0.008, 1.0)]
-            # vis.add('goal bound 0', goal_bounds[0], c=(0, 1, 0, 1))
-            # vis.add('goal bound 1', goal_bounds[1], c=(0, 1, 0, 1))
             qstart = robot.getConfig()
             res = pick.plan_pick_one(world, robot, swab, target_gripper, grasp_swab, robot0=True)
 
@@ -141,10 +130,8 @@ if __name__ == '__main__':
             else:
                 print("plan pick success")
                 transit, approach, lift = res
-
+                # plan place
                 qgrasp = lift.milestones[-1]
-                # get the grasp transform
-                print(qgrasp)
                 robot.setConfig(qgrasp)
                 Tobj = swab.getTransform()  # swab in world frame
                 # swab in gripper frame
@@ -172,20 +159,17 @@ if __name__ == '__main__':
                     trajectory_is_transfer.times.append(traj.endTime())
                     trajectory_is_transfer.milestones.append([1])
                     trajectory_is_transfer.milestones.append([0])
-                    # traj = traj.concat(retract, relative=True, jumpPolicy='jump')
-                    # trajectory_is_transfer.times.append(traj.endTime())
-                    # trajectory_is_transfer.milestones.append([0])
+
                     solved_trajectory = traj
 
                     swab.setTransform(*Tobj0)
 
                     vis.add("traj", traj, endEffectors=[gripper_link.index])
 
-        ############################# Plate & robot 2 starts here! ###########################################
+        ############################# Plan for Plate & robot 2 starts here! #################################
         elif next_robot_to_move == 1:
             Tobj0 = plate.getTransform()
             goal_bounds = [(0.7, 0.62, 0.71), (0.7, 0.62, 0.71)]
-            qstart = robot.getConfig()
             res = pick.plan_pick_one(world, robot2, plate, target_gripper, grasp_plate, robot0=False)
             if res is None:
                 print("Unable to plan pick")
@@ -200,7 +184,6 @@ if __name__ == '__main__':
                 Tobject_grasp = se3.mul(se3.inv(robot2.link(9).getTransform()), Tobj)
                 place.robot0 = False
                 res = place.plan_place(world, robot2, plate, Tobject_grasp, target_gripper, goal_bounds, False)
-                # robot.setConfig(qstart)
                 if res is None:
                     print("Unable to plan place")
                 else:
@@ -232,20 +215,13 @@ if __name__ == '__main__':
 
 
 
-        # robot.setConfig(qstart)
-        #
-        # traj = RobotTrajectory(robot, milestones=[qstart, qgrasp])
-        # vis.add("traj", traj, endEffectors=[gripper_link.index])
-        # solved_trajectory = traj
-        # robot.setConfig(qstart)
-
     vis.addAction(planTriggered,"Plan grasp",'p')
 
 
     executing_plan = False
     execute_start_time = None
 
-
+    # execute the planned path
     def executePlan():
         global solved_trajectory, trajectory_is_transfer, executing_plan, execute_start_time
         if solved_trajectory is None:
@@ -260,37 +236,14 @@ if __name__ == '__main__':
 
 
     vis.addAction(executePlan, "Execute plan", 'e')
-    
-    robot2_target = None
-    def transferPlate():
-        global robot2_target
-        plate_obj = world.rigidObject("plate")
-        plate_xform = plate_obj.getTransform()
-        plate_R, plate_t = plate_xform
-        link = robot.link('EndEffector_Link')
-        # goal = grasp_plate.ik_constraint
-        h = 0.1
-        goal = (0.1, 0.5, 0.8)
-        ee_local_pos = (0, 0, 0)
-        # we want the end effector to grasp from top of the object
-        ee_local_axis = source_gripper.primary_axis  # (1, 0, 0)
 
-        point_local_array = np.array(ee_local_pos)
-        axis_local_array = np.array(ee_local_axis)
-        axis_world_array = np.array([0, 0, -1])
-        objective = ik.objective(link, R=so3.from_rpy((-np.pi/2, 0, -np.pi/2)), t=list(np.array(goal)-np.array([0.16, 0, 0])))
-        ik.solve_global(objectives=objective, iters=50, numRestarts=5, activeDofs=[1, 2, 3, 4, 5, 6, 7])
-        # robot2_target = robot.getConfig()
-
-    vis.addAction(transferPlate, "Transfer plate", 't')
-    # vis.addAction(executePlan, "Execute plan", 'f')
 
     sim = Simulator(world)
     sim_dt = 0.02
     sensor = sim.controller(0).sensor("realsense")
     sensor2 = sim.controller(0).sensor("realsense")
 
-    vis.add("sensor", sensor)
+    # vis.add("sensor", sensor)
     was_grasping = False
 
 
@@ -305,9 +258,6 @@ if __name__ == '__main__':
         global sensor
         sensor.kinematicReset()
         sensor.kinematicSimulate(world,0.01)
-        # global robot2_target
-        # if robot2_target is not None:
-        #     robot2.setConfig(robot2_target)
         if next_robot_to_move == 0:
             cur_robot = robot
             cur_obj = swab
