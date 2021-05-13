@@ -4,13 +4,18 @@ For experiment demonstrations, please refer to the [youtube video](https://www.y
 
 <img src="/figures/setup.png" width="600" />
 
-## Introduction
-COVID-19 has been spreading for more than a year. Around 1.5M COVID tests are conducted daily in US.
+## Description
+COVID-19 has been spreading for more than a year. Around 1.5M COVID tests are conducted daily in the US.
 However, current testing procedure requires lots of human labors and exposes medical workers in high risk.
-In this project, we build a simulation pipeline for automatic COVID tests with two Kinova-gen3 robot arms:
+To increase the testing efficiency and keep us safe, we build a simulation pipeline for automatic COVID tests with two Kinova-gen3 robot arms. 
+
+The task procedure is as follows:
 - The left robot picks up a swab, uses the swab to collect testing samples from the human’s mouth, transfers the sample to a testing tube and then to a reaction plate, and disposes the swab into the trash can;
 - The right robot picks up the reaction plate, and puts the reaction plate onto the PCR testing machine.
 
+The objects in our simulator are shown below:
+
+<img src="/figures/objects.png" width="600" />
 
 We use [Klampt](http://motion.cs.illinois.edu/software/klampt/latest/pyklampt_docs/) to solve robot configurations in each waypoint and plan paths for the robots.
 
@@ -35,6 +40,8 @@ python main.py
 2. After the simulator window pops up, press key 'p' to plan the left robot. After the plan trajectories (orange lines) show up, press 'e' to execute the plan.
 
 3. Press 'p' and 'e' to do the same for the right robot.
+
+4. (Optional) Left click & drag: change the angle of viewpoint in the simulator, left click + ctrl: shift the viewpoint, left click + shift: zoom in/out.
 
 (We only tested our code in Ubuntu 16.04 with Python 3.6.)
 
